@@ -2709,7 +2709,23 @@ struct CxxrtlWorker {
 				f << "\n";
 				f << indent << "void reset() override;\n";
 				f << "\n";
-				f << indent << "bool eval(performer *performer = nullptr) override;\n";
+//****************//
+// mrinal_yadav_  //
+//****************//
+				// checks if there is any cell with [RTLIL::IdString id] EFX_LUT4, if returns nullptr it will got through it's usual route.
+
+				RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
+				RTLIL::Cell *ch = module->cell(lut_id);
+
+		 		if(ch != nullptr){
+					f << indent << "bool eval(const std::array<SignalWire *, 4> &Inputs, SignalWire *Output, uint16_t Mask) override;\n";
+				}else{
+
+					f << indent << "bool eval(performer *performer = nullptr) override;\n";
+				}
+
+
+
 				f << "\n";
 				f << indent << "template<class ObserverT>\n";
 				f << indent << "bool commit(ObserverT &observer) {\n";
@@ -2749,7 +2765,22 @@ struct CxxrtlWorker {
 		dump_reset_method(module);
 		f << indent << "}\n";
 		f << "\n";
-		f << indent << "bool " << mangle(module) << "::eval(performer *performer) {\n";
+//*******************//
+//  _mrinal_yadav_   //
+//*******************//
+
+
+		RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
+		RTLIL::Cell *ch = module->cell(lut_id);
+
+		if(ch != nullptr){
+			f << indent << "bool " << mangle(module) <<"(const std::array<SignalWire *, 4> &Inputs, SignalWire *Output, uint16_t Mask) {\n";
+		}else{
+			f << indent << "bool " << mangle(module) << "::eval(performer *performer) {\n";
+			}
+
+
+
 		dump_eval_method(module);
 		f << indent << "}\n";
 		if (debug_info) {
