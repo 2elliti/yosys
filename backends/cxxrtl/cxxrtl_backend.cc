@@ -2654,103 +2654,128 @@ struct CxxrtlWorker {
 				}
 			}
 		} else {
-			f << indent << "struct " << mangle(module) << " : public module {\n";
-			inc_indent();
-				for (auto wire : module->wires())
-					dump_wire(wire, /*is_local=*/false);
-				for (auto wire : module->wires())
-					dump_debug_wire(wire, /*is_local=*/false);
-				bool has_memories = false;
-				for (auto &mem : mod_memories[module]) {
-					dump_attrs(&mem);
-					f << indent << "memory<" << mem.width << "> " << mangle(&mem)
-					            << " { " << mem.size << "u };\n";
-					has_memories = true;
-				}
-				if (has_memories)
-					f << "\n";
-				bool has_cells = false;
-				for (auto cell : module->cells()) {
-					// Async and initial effectful cells have additional state, which requires storage.
-					if (is_effectful_cell(cell->type)) {
-						if (cell->getParam(ID::TRG_ENABLE).as_bool() && cell->getParam(ID::TRG_WIDTH).as_int() == 0)
-							f << indent << "value<1> " << mangle(cell) << ";\n"; // async initial cell
-						if (!cell->getParam(ID::TRG_ENABLE).as_bool() && cell->type == ID($print))
-							f << indent << "value<" << (1 + cell->getParam(ID::ARGS_WIDTH).as_int()) << "> " << mangle(cell) << ";\n"; // {EN, ARGS}
-						if (!cell->getParam(ID::TRG_ENABLE).as_bool() && cell->type == ID($check))
-							f << indent << "value<2> " << mangle(cell) << ";\n"; // {EN, A}
+//***********************//
+//_mrinal_cell_pointer_  //
+//***********************//
+			RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
+			RTLIL::Cell *has_efxcell = module->cell(lut_id);
+			// f << indent << "struct " << mangle(module) << " : public module {\n";
+			// inc_indent();
+
+
+			// from here
+
+				if(has_efxcell != nullptr){
+					f << indent << "struct " << mangle(module) << "{\n";
+					inc_indent();
+
+					f<< indent << "// This comment will only be printed out if we have LUT__6 Type cell.\n";
+
+				}else{
+					f << indent << "struct " << mangle(module) << " : public module {\n";
+					inc_indent();
+
+					for (auto wire : module->wires())
+						dump_wire(wire, /*is_local=*/false);
+					for (auto wire : module->wires())
+						dump_debug_wire(wire, /*is_local=*/false);
+					bool has_memories = false;
+					for (auto &mem : mod_memories[module]) {
+						dump_attrs(&mem);
+						f << indent << "memory<" << mem.width << "> " << mangle(&mem)
+									<< " { " << mem.size << "u };\n";
+						has_memories = true;
 					}
-					if (is_internal_cell(cell->type))
-						continue;
-					dump_attrs(cell);
-					RTLIL::Module *cell_module = module->design->module(cell->type);
-					log_assert(cell_module != nullptr);
-					if (cell_module->get_bool_attribute(ID(cxxrtl_blackbox))) {
-						f << indent << "std::unique_ptr<" << mangle(cell_module) << template_args(cell) << "> ";
-						f << mangle(cell) << " = " << mangle(cell_module) << template_args(cell);
-						f << "::create(" << escape_cxx_string(get_hdl_name(cell)) << ", ";
-						dump_metadata_map(cell->parameters);
-						f << ", ";
-						dump_metadata_map(cell->attributes);
-						f << ");\n";
-					} else {
-						f << indent << mangle(cell_module) << " " << mangle(cell) << " {interior()};\n";
+					if (has_memories)
+						f << "\n";
+					bool has_cells = false;
+					for (auto cell : module->cells()) {
+						// Async and initial effectful cells have additional state, which requires storage.
+						if (is_effectful_cell(cell->type)) {
+							if (cell->getParam(ID::TRG_ENABLE).as_bool() && cell->getParam(ID::TRG_WIDTH).as_int() == 0)
+								f << indent << "value<1> " << mangle(cell) << ";\n"; // async initial cell
+							if (!cell->getParam(ID::TRG_ENABLE).as_bool() && cell->type == ID($print))
+								f << indent << "value<" << (1 + cell->getParam(ID::ARGS_WIDTH).as_int()) << "> " << mangle(cell) << ";\n"; // {EN, ARGS}
+							if (!cell->getParam(ID::TRG_ENABLE).as_bool() && cell->type == ID($check))
+								f << indent << "value<2> " << mangle(cell) << ";\n"; // {EN, A}
+						}
+						if (is_internal_cell(cell->type))
+							continue;
+						dump_attrs(cell);
+						RTLIL::Module *cell_module = module->design->module(cell->type);
+						log_assert(cell_module != nullptr);
+						if (cell_module->get_bool_attribute(ID(cxxrtl_blackbox))) {
+							f << indent << "std::unique_ptr<" << mangle(cell_module) << template_args(cell) << "> ";
+							f << mangle(cell) << " = " << mangle(cell_module) << template_args(cell);
+							f << "::create(" << escape_cxx_string(get_hdl_name(cell)) << ", ";
+							dump_metadata_map(cell->parameters);
+							f << ", ";
+							dump_metadata_map(cell->attributes);
+							f << ");\n";
+						} else {
+							f << indent << mangle(cell_module) << " " << mangle(cell) << " {interior()};\n";
+						}
+						has_cells = true;
 					}
-					has_cells = true;
-				}
-				if (has_cells)
+					if (has_cells)
+						f << "\n";
+					f << indent << mangle(module) << "(interior) {}\n";
+					f << indent << mangle(module) << "() {\n";
+					inc_indent();
+						f << indent << "reset();\n";
+					dec_indent();
+					f << indent << "};\n";
 					f << "\n";
-				f << indent << mangle(module) << "(interior) {}\n";
-				f << indent << mangle(module) << "() {\n";
-				inc_indent();
-					f << indent << "reset();\n";
-				dec_indent();
-				f << indent << "};\n";
-				f << "\n";
-				f << indent << "void reset() override;\n";
-				f << "\n";
-//****************//
-// mrinal_yadav_  //
-//****************//
+					f << indent << "void reset() override;\n";
+				}
+			// to here
+
+					f << "\n";
+//****************************//
+// _mrinal_yadav_eval()_intf  //
+//****************************//
 				// checks if there is any cell with [RTLIL::IdString id] EFX_LUT4, if returns nullptr it will got through it's usual route.
 
-				RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
-				RTLIL::Cell *ch = module->cell(lut_id);
+				// RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
+				// RTLIL::Cell *ch = module->cell(lut_id);
 
-		 		if(ch != nullptr){
+				// From here to
+
+
+				if(has_efxcell != nullptr){
 					f << indent << "bool eval(const std::array<SignalWire *, 4> &Inputs, SignalWire *Output, uint16_t Mask) override;\n";
 				}else{
-
 					f << indent << "bool eval(performer *performer = nullptr) override;\n";
-				}
-
-
-
-				f << "\n";
-				f << indent << "template<class ObserverT>\n";
-				f << indent << "bool commit(ObserverT &observer) {\n";
-				dump_commit_method(module);
-				f << indent << "}\n";
-				f << "\n";
-				f << indent << "bool commit() override {\n";
-				f << indent << indent << "observer observer;\n";
-				f << indent << indent << "return commit<>(observer);\n";
-				f << indent << "}\n";
-				if (debug_info) {
-					if (debug_eval) {
-						f << "\n";
-						f << indent << "void debug_eval();\n";
-						for (auto wire : module->wires())
-							if (debug_wire_types[wire].is_outline()) {
-								f << indent << "debug_outline debug_eval_outline { std::bind(&"
-								            << mangle(module) << "::debug_eval, this) };\n";
-								break;
-							}
-					}
 					f << "\n";
-					f << indent << "void debug_info(debug_items *items, debug_scopes *scopes, "
-					            << "std::string path, metadata_map &&cell_attrs = {}) override;\n";
+					f << indent << "template<class ObserverT>\n";
+					f << indent << "bool commit(ObserverT &observer) {\n";
+					dump_commit_method(module);
+					f << indent << "}\n";
+					f << "\n";
+					f << indent << "bool commit() override {\n";
+					f << indent << indent << "observer observer;\n";
+					f << indent << indent << "return commit<>(observer);\n";
+					f << indent << "}\n";
+					if (debug_info) {
+						if (debug_eval) {
+							f << "\n";
+							f << indent << "void debug_eval();\n";
+							for (auto wire : module->wires())
+								if (debug_wire_types[wire].is_outline()) {
+									f << indent << "debug_outline debug_eval_outline { std::bind(&"
+												<< mangle(module) << "::debug_eval, this) };\n";
+									break;
+								}
+						}
+						f << "\n";
+						f << indent << "void debug_info(debug_items *items, debug_scopes *scopes, "
+									<< "std::string path, metadata_map &&cell_attrs = {}) override;\n";
+					}
+
+
+
 				}
+
 			dec_indent();
 			f << indent << "}; // struct " << mangle(module) << "\n";
 			f << "\n";
@@ -2759,49 +2784,57 @@ struct CxxrtlWorker {
 
 	void dump_module_impl(RTLIL::Module *module)
 	{
-		if (module->get_bool_attribute(ID(cxxrtl_blackbox)))
-			return;
-		f << indent << "void " << mangle(module) << "::reset() {\n";
-		dump_reset_method(module);
-		f << indent << "}\n";
-		f << "\n";
-//*******************//
-//  _mrinal_yadav_   //
-//*******************//
+
+//******************************//
+//  _mrinal_yadav_eval()_impl   //
+//******************************//
 
 
 		RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
 		RTLIL::Cell *ch = module->cell(lut_id);
+		// if (module->get_bool_attribute(ID(cxxrtl_blackbox)))
+		// 	return;
+		// f << indent << "void " << mangle(module) << "::reset() {\n";
+		// dump_reset_method(module);
+		// f << indent << "}\n";
+		// f << "\n";
+
 
 		if(ch != nullptr){
-			f << indent << "bool " << mangle(module) <<"(const std::array<SignalWire *, 4> &Inputs, SignalWire *Output, uint16_t Mask) {\n";
+			f << indent << "bool " << mangle(module) <<"::eval(const std::array<SignalWire *, 4> &Inputs, SignalWire *Output, uint16_t Mask) {\n";
 		}else{
+
+			if (module->get_bool_attribute(ID(cxxrtl_blackbox)))
+			return;
+			f << indent << "void " << mangle(module) << "::reset() {\n";
+			dump_reset_method(module);
+			f << indent << "}\n";
+			f << "\n";
 			f << indent << "bool " << mangle(module) << "::eval(performer *performer) {\n";
-			}
-
-
-
-		dump_eval_method(module);
-		f << indent << "}\n";
-		if (debug_info) {
-			if (debug_eval) {
+			dump_eval_method(module);
+			f << indent << "}\n";
+			if (debug_info) {
+				if (debug_eval) {
+					f << "\n";
+					f << indent << "void " << mangle(module) << "::debug_eval() {\n";
+					dump_debug_eval_method(module);
+					f << indent << "}\n";
+				}
 				f << "\n";
-				f << indent << "void " << mangle(module) << "::debug_eval() {\n";
-				dump_debug_eval_method(module);
+				f << indent << "CXXRTL_EXTREMELY_COLD\n";
+				f << indent << "void " << mangle(module) << "::debug_info(debug_items *items, debug_scopes *scopes, "
+							<< "std::string path, metadata_map &&cell_attrs) {\n";
+				dump_debug_info_method(module);
 				f << indent << "}\n";
 			}
+
+	}
 			f << "\n";
-			f << indent << "CXXRTL_EXTREMELY_COLD\n";
-			f << indent << "void " << mangle(module) << "::debug_info(debug_items *items, debug_scopes *scopes, "
-			            << "std::string path, metadata_map &&cell_attrs) {\n";
-			dump_debug_info_method(module);
-			f << indent << "}\n";
-		}
-		f << "\n";
 	}
 
 	void dump_design(RTLIL::Design *design)
 	{
+
 		RTLIL::Module *top_module = nullptr;
 		std::vector<RTLIL::Module*> modules;
 		TopoSort<RTLIL::Module*> topo_design;
@@ -2828,74 +2861,97 @@ struct CxxrtlWorker {
 		log_assert(no_loops);
 		modules.insert(modules.end(), topo_design.sorted.begin(), topo_design.sorted.end());
 
-		if (split_intf) {
-			// The only thing more depraved than include guards, is mangling filenames to turn them into include guards.
-			std::string include_guard = design_ns + "_header";
-			std::transform(include_guard.begin(), include_guard.end(), include_guard.begin(), ::toupper);
+		RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
+		RTLIL::Cell *ch = top_module->cell(lut_id);
 
-			f << "#ifndef " << include_guard << "\n";
-			f << "#define " << include_guard << "\n";
-			f << "\n";
-			if (top_module != nullptr && debug_info) {
-				f << "#include <cxxrtl/capi/cxxrtl_capi.h>\n";
+
+
+		if(ch != nullptr){
+				f << "#include <iostream>\n";
+		}else{
+			if (split_intf) {
+				// The only thing more depraved than include guards, is mangling filenames to turn them into include guards.
+				std::string include_guard = design_ns + "_header";
+				std::transform(include_guard.begin(), include_guard.end(), include_guard.begin(), ::toupper);
+
+				f << "#ifndef " << include_guard << "\n";
+				f << "#define " << include_guard << "\n";
 				f << "\n";
+				if (top_module != nullptr && debug_info) {
+					f << "#include <cxxrtl/capi/cxxrtl_capi.h>\n";
+					f << "\n";
+					f << "#ifdef __cplusplus\n";
+					f << "extern \"C\" {\n";
+					f << "#endif\n";
+					f << "\n";
+					f << "cxxrtl_toplevel " << design_ns << "_create();\n";
+					f << "\n";
+					f << "#ifdef __cplusplus\n";
+					f << "}\n";
+					f << "#endif\n";
+					f << "\n";
+				} else {
+					f << "// The CXXRTL C API is not available because the design is built without debug information.\n";
+					f << "\n";
+				}
 				f << "#ifdef __cplusplus\n";
-				f << "extern \"C\" {\n";
+				f << "\n";
+				f << "#include <cxxrtl/cxxrtl.h>\n";
+				f << "\n";
+				f << "using namespace cxxrtl;\n";
+				f << "\n";
+				f << "namespace " << design_ns << " {\n";
+				f << "\n";
+				for (auto module : modules)
+					dump_module_intf(module);
+				f << "} // namespace " << design_ns << "\n";
+				f << "\n";
+				f << "#endif // __cplusplus\n";
+				f << "\n";
 				f << "#endif\n";
-				f << "\n";
-				f << "cxxrtl_toplevel " << design_ns << "_create();\n";
-				f << "\n";
-				f << "#ifdef __cplusplus\n";
-				f << "}\n";
-				f << "#endif\n";
-				f << "\n";
-			} else {
-				f << "// The CXXRTL C API is not available because the design is built without debug information.\n";
-				f << "\n";
+				*intf_f << f.str(); f.str("");
 			}
-			f << "#ifdef __cplusplus\n";
+
+			if (split_intf)
+				f << "#include \"" << basename(intf_filename) << "\"\n";
+			else
+				f << "#include <cxxrtl/cxxrtl.h>\n";
 			f << "\n";
-			f << "#include <cxxrtl/cxxrtl.h>\n";
+			f << "#if defined(CXXRTL_INCLUDE_CAPI_IMPL) || \\\n";
+			f << "    defined(CXXRTL_INCLUDE_VCD_CAPI_IMPL)\n";
+			f << "#include <cxxrtl/capi/cxxrtl_capi.cc>\n";
+			f << "#endif\n";
 			f << "\n";
-			f << "using namespace cxxrtl;\n";
+			f << "#if defined(CXXRTL_INCLUDE_VCD_CAPI_IMPL)\n";
+			f << "#include <cxxrtl/capi/cxxrtl_capi_vcd.cc>\n";
+			f << "#endif\n";
+			f << "\n";
+			f << "using namespace cxxrtl_yosys;\n";
 			f << "\n";
 			f << "namespace " << design_ns << " {\n";
 			f << "\n";
-			for (auto module : modules)
-				dump_module_intf(module);
-			f << "} // namespace " << design_ns << "\n";
-			f << "\n";
-			f << "#endif // __cplusplus\n";
-			f << "\n";
-			f << "#endif\n";
-			*intf_f << f.str(); f.str("");
 		}
 
-		if (split_intf)
-			f << "#include \"" << basename(intf_filename) << "\"\n";
-		else
-			f << "#include <cxxrtl/cxxrtl.h>\n";
-		f << "\n";
-		f << "#if defined(CXXRTL_INCLUDE_CAPI_IMPL) || \\\n";
-		f << "    defined(CXXRTL_INCLUDE_VCD_CAPI_IMPL)\n";
-		f << "#include <cxxrtl/capi/cxxrtl_capi.cc>\n";
-		f << "#endif\n";
-		f << "\n";
-		f << "#if defined(CXXRTL_INCLUDE_VCD_CAPI_IMPL)\n";
-		f << "#include <cxxrtl/capi/cxxrtl_capi_vcd.cc>\n";
-		f << "#endif\n";
-		f << "\n";
-		f << "using namespace cxxrtl_yosys;\n";
-		f << "\n";
-		f << "namespace " << design_ns << " {\n";
-		f << "\n";
+
+
 		for (auto module : modules) {
 			if (!split_intf)
 				dump_module_intf(module);
 			dump_module_impl(module);
 		}
+
+		if(ch != nullptr){
+			f << "}"<<design_ns<<"\n";
+		}else{
 		f << "} // namespace " << design_ns << "\n";
+		}
+
 		f << "\n";
+
+
+
+
+
 		if (top_module != nullptr && debug_info) {
 			f << "extern \"C\"\n";
 			f << "cxxrtl_toplevel " << design_ns << "_create() {\n";
