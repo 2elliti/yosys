@@ -42,6 +42,50 @@ PRIVATE_NAMESPACE_BEGIN
 // We wish to support designs with such benign SCCs (as well as designs with multiple drivers per wire), so
 // we sort the graph in a way that minimizes feedback arcs. If there are no feedback arcs in the sorted graph,
 // then a more efficient evaluation method is possible, since eval() will always immediately converge.
+
+
+bool check_for_lut(RTLIL::Cell* chk_cell){
+	std::string id_string = chk_cell->name.str();
+	if(id_string[0] == 92 && id_string[1] == 'L' && id_string[2] == 'U' ){
+		return true;
+	}else{
+		return false;
+	}
+
+}
+// && id_string[3] == '_' && id_string[4] == '_'
+
+bool check_for_ff(RTLIL::Cell* chk_cell){
+	std::string id_string = chk_cell->name.str();
+	int lt;
+	lt = id_string.length();
+	if(id_string[lt-1]=='F' && id_string[lt-2]=='F' && id_string[lt-3] == '~'){
+		return true;
+	}else{
+		return false;
+	}
+}
+
+bool check_for_gbufce(RTLIL::Cell* chk_cell){\
+	std::string id_string = chk_cell->name.str();
+	if(id_string[0] == 'C' && id_string[1] =='L' && id_string[2] == 'K' && id_string[3] == 'B' && id_string[4] == 'U' && id_string[5] == 'F'){
+		return true;
+	}else{
+		return false;
+	}
+
+}
+
+
+
+
+
+
+
+
+
+
+
 template<class T>
 struct Scheduler {
 	struct Vertex {
@@ -2024,6 +2068,10 @@ struct CxxrtlWorker {
 		}
 	}
 
+
+
+
+
 	void dump_wire(const RTLIL::Wire *wire, bool is_local)
 	{
 		const auto &wire_type = wire_types[wire];
@@ -2589,6 +2637,31 @@ struct CxxrtlWorker {
 			          count_skipped_wires > 0 ? " (debug unavailable)" : "");
 		}
 	}
+		//	mrinal
+// dumping wire content.
+// No idea wether it will work or not.
+	std::string placeholder (RTLIL::Cell *cell){
+		if(check_for_lut(cell)){
+			return "EFX_LUT4";
+		}
+		if(check_for_ff(cell)){
+			return "EFX_FF";
+		}
+		if(check_for_gbufce(cell)){
+			return "EFX_CLKBUF";
+		}
+		return "<--Unknown type-->";
+	}
+	
+	void temp_print_wires(RTLIL::Cell *cell){
+	std::cout << placeholder(cell)<< "():";
+	// 	for(auto con : cell->connections_){
+	// 		std::cout << con.first.str() << ".(" << con.second.as_string()<<"), ";
+	// 	}
+	// std::cout <<"{}\n";
+
+	}
+
 
 	void dump_module_intf(RTLIL::Module *module)
 	{
@@ -2654,22 +2727,95 @@ struct CxxrtlWorker {
 				}
 			}
 		} else {
-//***********************//
-//_mrinal_cell_pointer_  //
-//***********************//
-			RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
-			RTLIL::Cell *has_efxcell = module->cell(lut_id);
-			// f << indent << "struct " << mangle(module) << " : public module {\n";
-			// inc_indent();
+//
+//	CORRECTION 1
+//
 
+			bool generate_our_code = false;
+			bool has_lut = false;
+			bool has_ff = false;
+			bool has_clk = false;
+			bool lut_mutex = true;
+			bool ff_mutex = true;
+			bool clk_mutex = true;
+		 	for(auto chk_cell:module->selected_cells()){
+				
+				if(check_for_lut(chk_cell) && lut_mutex){
+					generate_our_code = true;
+					has_lut = true;
+					lut_mutex = false;
+				}
+				if(check_for_ff(chk_cell) && ff_mutex){
+					generate_our_code = true;
+					has_ff = true;
+					ff_mutex = false;
+				}
+				if(check_for_gbufce(chk_cell) && clk_mutex){
+					generate_our_code = true;
+					has_clk = true;
+					clk_mutex = false;
+				}
+			
+			}
 
-			// from here
+//
+//	CORRECTION 2
+//
+				if(generate_our_code){
 
-				if(has_efxcell != nullptr){
-					f << indent << "struct " << mangle(module) << "{\n";
-					inc_indent();
+//
+//				FOR EFX_LUT
+//
 
-					f<< indent << "// This comment will only be printed out if we have LUT__6 Type cell.\n";
+					if(has_lut){
+						f << indent << "class EFX_LUT4{\n";
+						f << indent << "// This comment will only be printed out if we have EFX_LUT4 Type cell.\n";
+						for(auto cell: module->selected_cells()){
+							if(check_for_lut){
+								temp_print_wires(cell);
+							}else{
+								continue;
+							}
+						}
+						f << indent << "\n";				
+						f << indent << "}; " << "\n";
+						f << indent << "\n\n\n";
+					}
+//
+//				FOR EFX_FF
+//
+					if(has_ff){
+						f << indent << "class EFX_FF{\n";
+						f << indent << "// This comment will only be printed out if we have EFX_FF Type cell.\n";
+						for(auto cell: module->selected_cells()){
+							if(check_for_ff){
+								temp_print_wires(cell);
+							}else{
+								continue;
+							}
+						}
+						f << indent << "\n";
+						f << indent << "}; " << "\n";
+						f << indent << "\n\n\n";
+					}
+//
+//				FOR CLOCK
+//
+					if(has_clk){
+						f << indent << "class EFX_CLKBUF{\n";
+						f << indent << "// This comment will only be printed out if we have EFX_CLKBUF Type cell.\n";
+						for(auto cell: module->selected_cells()){
+							if(check_for_gbufce){
+								temp_print_wires(cell);
+							}else{
+								continue;
+							}
+						}
+						f << indent << "\n";
+						f << indent << "}; " << "\n";
+						f << indent << "\n";
+					}
+
 
 				}else{
 					f << indent << "struct " << mangle(module) << " : public module {\n";
@@ -2727,24 +2873,16 @@ struct CxxrtlWorker {
 					f << indent << "};\n";
 					f << "\n";
 					f << indent << "void reset() override;\n";
-				}
+				
 			// to here
 
 					f << "\n";
-//****************************//
-// _mrinal_yadav_eval()_intf  //
-//****************************//
-				// checks if there is any cell with [RTLIL::IdString id] EFX_LUT4, if returns nullptr it will got through it's usual route.
-
-				// RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
-				// RTLIL::Cell *ch = module->cell(lut_id);
-
-				// From here to
 
 
-				if(has_efxcell != nullptr){
-					f << indent << "bool eval(const std::array<SignalWire *, 4> &Inputs, SignalWire *Output, uint16_t Mask) override;\n";
-				}else{
+//
+//	CORRECTION 3
+//
+
 					f << indent << "bool eval(performer *performer = nullptr) override;\n";
 					f << "\n";
 					f << indent << "template<class ObserverT>\n";
@@ -2774,11 +2912,12 @@ struct CxxrtlWorker {
 
 
 
-				}
+				// }
 
 			dec_indent();
 			f << indent << "}; // struct " << mangle(module) << "\n";
 			f << "\n";
+		}
 		}
 	}
 
@@ -2790,18 +2929,40 @@ struct CxxrtlWorker {
 //******************************//
 
 
-		RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
-		RTLIL::Cell *ch = module->cell(lut_id);
-		// if (module->get_bool_attribute(ID(cxxrtl_blackbox)))
-		// 	return;
-		// f << indent << "void " << mangle(module) << "::reset() {\n";
-		// dump_reset_method(module);
-		// f << indent << "}\n";
-		// f << "\n";
+//
+//	CORRECTION 4
+//
+
+		// RTLIL::IdString lut_id = RTLIL::escape_id("\\EFX_LUT4");
+		// RTLIL::Cell *ch = module->cell(lut_id);
 
 
-		if(ch != nullptr){
-			f << indent << "bool " << mangle(module) <<"::eval(const std::array<SignalWire *, 4> &Inputs, SignalWire *Output, uint16_t Mask) {\n";
+
+		bool generate_our_code = false;
+		for(auto chk_cell:module->selected_cells()){
+				
+				if(check_for_lut(chk_cell)){
+					generate_our_code = true;
+					// has_lut = true;
+				}
+				if(check_for_ff(chk_cell)){
+					generate_our_code = true;
+					// has_ff = true;
+				}
+				if(check_for_gbufce(chk_cell)){
+					generate_our_code = true;
+					// has_clk = true;
+				}
+			
+			}
+
+
+//
+//	CORRECTION 5
+//
+
+		if(generate_our_code){
+			// f << indent << "bool " << mangle(module) <<"::eval(const std::array<SignalWire *, 4> &Inputs, SignalWire *Output, uint16_t Mask) {\n";
 		}else{
 
 			if (module->get_bool_attribute(ID(cxxrtl_blackbox)))
@@ -2861,13 +3022,38 @@ struct CxxrtlWorker {
 		log_assert(no_loops);
 		modules.insert(modules.end(), topo_design.sorted.begin(), topo_design.sorted.end());
 
-		RTLIL::IdString lut_id = RTLIL::escape_id("\\LUT__6");
-		RTLIL::Cell *ch = top_module->cell(lut_id);
+//
+//	CORRECTION 6
+//
 
 
+		// RTLIL::IdString lut_id = RTLIL::escape_id("\\EFX_LUT4");
+		// RTLIL::Cell *ch = top_module->cell(lut_id);
+		
+		bool generate_our_code = false;
+		for(auto chk_cell:top_module->selected_cells()){
+				std::string chk_id = chk_cell->name.str();
+				if(check_for_lut(chk_cell)){
+					generate_our_code = true;
+					// has_lut = true;
+				}
+				if(check_for_ff(chk_cell)){
+					generate_our_code = true;
+					// has_ff = true;
+				}
+				if(check_for_gbufce(chk_cell)){
+					generate_our_code = true;
+					// has_clk = true;
+				}
+			
+			}
 
-		if(ch != nullptr){
-				f << "#include <iostream>\n";
+
+//
+//	CORRECTION 7
+//
+		if(generate_our_code){
+				f << "#// Header files.\n";
 		}else{
 			if (split_intf) {
 				// The only thing more depraved than include guards, is mangling filenames to turn them into include guards.
@@ -2940,8 +3126,11 @@ struct CxxrtlWorker {
 			dump_module_impl(module);
 		}
 
-		if(ch != nullptr){
-			f << "}"<<design_ns<<"\n";
+//
+//	CORRECTION 8
+//
+		if(generate_our_code){
+			f << "\n";
 		}else{
 		f << "} // namespace " << design_ns << "\n";
 		}
@@ -2949,19 +3138,26 @@ struct CxxrtlWorker {
 		f << "\n";
 
 
+//
+// 	CORRECTION 9
+//
 
 
+		if(generate_our_code){
+			f << "\n";
+		}else{
 
-		if (top_module != nullptr && debug_info) {
-			f << "extern \"C\"\n";
-			f << "cxxrtl_toplevel " << design_ns << "_create() {\n";
-			inc_indent();
-				std::string top_type = design_ns + "::" + mangle(top_module);
-				f << indent << "return new _cxxrtl_toplevel { ";
-				f << "std::unique_ptr<" << top_type << ">(new " + top_type + ")";
-				f << " };\n";
-			dec_indent();
-			f << "}\n";
+			if (top_module != nullptr && debug_info) {
+				f << "extern \"C\"\n";
+				f << "cxxrtl_toplevel " << design_ns << "_create() {\n";
+				inc_indent();
+					std::string top_type = design_ns + "::" + mangle(top_module);
+					f << indent << "return new _cxxrtl_toplevel { ";
+					f << "std::unique_ptr<" << top_type << ">(new " + top_type + ")";
+					f << " };\n";
+				dec_indent();
+				f << "}\n";
+			}
 		}
 
 		*impl_f << f.str(); f.str("");
