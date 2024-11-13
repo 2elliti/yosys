@@ -26,6 +26,10 @@
 #include "kernel/log.h"
 #include "kernel/fmt.h"
 #include "kernel/scopeinfo.h"
+#include "backends/rtlil/rtlil_backend.h"
+#include "kernel/yosys.h"
+#include "errno.h"
+
 
 USING_YOSYS_NAMESPACE
 PRIVATE_NAMESPACE_BEGIN
@@ -2646,22 +2650,10 @@ struct CxxrtlWorker {
 
 	void temp_print(RTLIL::Cell *cell,RTLIL::IdString id){
 		
-		// for(auto y : cell->){
-		// 	std::cout << y.first.str() << "---" <<y.second.as_string()<< "\n";
-		// }
+// THis for dumping cell.
+		RTLIL_BACKEND::dump_cell(f,indent.c_str(),cell);
 
-		// // auto yid = cell->getPort(id);
-		// // f << "port { }"<< yid.as_string()<<"\n";
-			f << "ia asdad\n"; 
-			size_t sixe = cell->connections().size();
-			f << "size of connection:"<< sixe <<"\n";
-			for(auto x: cell->connections()){
-				f << "[ID]:"<<x.first.str() << " [SigSpec]:"<<x.second.as_string()<<"\n";
-			}
 		
-
-
-
 		f << "{}\n";	
 
 
