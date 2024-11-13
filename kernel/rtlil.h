@@ -1249,6 +1249,8 @@ struct RTLIL::Design
 #endif
 };
 
+// module is here
+
 struct RTLIL::Module : public RTLIL::AttrObject
 {
 	unsigned int hashidx_;

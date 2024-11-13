@@ -44,37 +44,7 @@ PRIVATE_NAMESPACE_BEGIN
 // then a more efficient evaluation method is possible, since eval() will always immediately converge.
 
 
-bool check_for_lut(RTLIL::Cell* chk_cell){
-	std::string id_string = chk_cell->name.str();
-	if(id_string[0] == 92 && id_string[1] == 'L' && id_string[2] == 'U' ){
-		return true;
-	}else{
-		return false;
-	}
 
-}
-// && id_string[3] == '_' && id_string[4] == '_'
-
-bool check_for_ff(RTLIL::Cell* chk_cell){
-	std::string id_string = chk_cell->name.str();
-	int lt;
-	lt = id_string.length();
-	if(id_string[lt-1]=='F' && id_string[lt-2]=='F' && id_string[lt-3] == '~'){
-		return true;
-	}else{
-		return false;
-	}
-}
-
-bool check_for_gbufce(RTLIL::Cell* chk_cell){\
-	std::string id_string = chk_cell->name.str();
-	if(id_string[0] == 'C' && id_string[1] =='L' && id_string[2] == 'K' && id_string[3] == 'B' && id_string[4] == 'U' && id_string[5] == 'F'){
-		return true;
-	}else{
-		return false;
-	}
-
-}
 
 
 
@@ -2072,6 +2042,7 @@ struct CxxrtlWorker {
 
 
 
+
 	void dump_wire(const RTLIL::Wire *wire, bool is_local)
 	{
 		const auto &wire_type = wire_types[wire];
@@ -2404,6 +2375,40 @@ struct CxxrtlWorker {
 			f << indent << "})";
 		}
 	}
+	bool check_for_lut(RTLIL::Cell* chk_cell){
+		std::string id_string = chk_cell->name.str();
+		if(id_string[0] == 92 && id_string[1] == 'L' && id_string[2] == 'U' ){
+			return true;
+		}else{
+			return false;
+		}
+
+	}
+
+
+	bool check_for_ff(RTLIL::Cell* chk_cell){
+		std::string id_string = chk_cell->name.str();
+		int lt;
+		lt = id_string.length();
+		if(id_string[lt-1]=='F' && id_string[lt-2]=='F' && id_string[lt-3] == '~'){
+			return true;
+		}else{
+			return false;
+		}
+	}
+	//&& id_string[3] == 'B' && id_string[4] == 'U' && id_string[5] == 'F'
+	// && id_string[3] == 'K'
+	bool check_for_gbufce(RTLIL::Cell* chk_cell){
+		
+		std::string id_string = chk_cell->name.str();
+		// std::cout << "[ID STRING]:" <<id_string << "\n\n\n";
+		if(id_string[0] == '\\' && id_string[1] =='C' && id_string[2] == 'L'){
+			return true;
+		}else{
+			return false;
+		}
+
+	}
 
 	void dump_debug_attrs(const RTLIL::AttrObject *object, bool serialize = true)
 	{
@@ -2637,31 +2642,30 @@ struct CxxrtlWorker {
 			          count_skipped_wires > 0 ? " (debug unavailable)" : "");
 		}
 	}
-		//	mrinal
-// dumping wire content.
-// No idea wether it will work or not.
-	std::string placeholder (RTLIL::Cell *cell){
-		if(check_for_lut(cell)){
-			return "EFX_LUT4";
-		}
-		if(check_for_ff(cell)){
-			return "EFX_FF";
-		}
-		if(check_for_gbufce(cell)){
-			return "EFX_CLKBUF";
-		}
-		return "<--Unknown type-->";
-	}
-	
-	void temp_print_wires(RTLIL::Cell *cell){
-	std::cout << placeholder(cell)<< "():";
-	// 	for(auto con : cell->connections_){
-	// 		std::cout << con.first.str() << ".(" << con.second.as_string()<<"), ";
-	// 	}
-	// std::cout <<"{}\n";
+//mrinal
+
+	void temp_print(RTLIL::Cell *cell,RTLIL::IdString id){
+		
+		// for(auto y : cell->){
+		// 	std::cout << y.first.str() << "---" <<y.second.as_string()<< "\n";
+		// }
+
+		// // auto yid = cell->getPort(id);
+		// // f << "port { }"<< yid.as_string()<<"\n";
+			f << "ia asdad\n"; 
+			size_t sixe = cell->connections().size();
+			f << "size of connection:"<< sixe <<"\n";
+			for(auto x: cell->connections()){
+				f << "[ID]:"<<x.first.str() << " [SigSpec]:"<<x.second.as_string()<<"\n";
+			}
+		
+
+
+
+		f << "{}\n";	
+
 
 	}
-
 
 	void dump_module_intf(RTLIL::Module *module)
 	{
@@ -2735,27 +2739,23 @@ struct CxxrtlWorker {
 			bool has_lut = false;
 			bool has_ff = false;
 			bool has_clk = false;
-			bool lut_mutex = true;
-			bool ff_mutex = true;
-			bool clk_mutex = true;
-		 	for(auto chk_cell:module->selected_cells()){
-				
-				if(check_for_lut(chk_cell) && lut_mutex){
+
+		 	for(auto chk_cell:module->cells()){
+
+				if(check_for_lut(chk_cell)){
 					generate_our_code = true;
 					has_lut = true;
-					lut_mutex = false;
 				}
-				if(check_for_ff(chk_cell) && ff_mutex){
+				if(check_for_ff(chk_cell)){
 					generate_our_code = true;
 					has_ff = true;
-					ff_mutex = false;
 				}
-				if(check_for_gbufce(chk_cell) && clk_mutex){
+				if(check_for_gbufce(chk_cell)){
 					generate_our_code = true;
 					has_clk = true;
-					clk_mutex = false;
 				}
-			
+				// bool tmp = check_for_gbufce(chk_cell);
+				// std::cout <<"\n****[bool]: " <<tmp<<"\n";
 			}
 
 //
@@ -2766,20 +2766,38 @@ struct CxxrtlWorker {
 //
 //				FOR EFX_LUT
 //
-
+					// for(auto x: module->selected_cells()){
+					// 	for(auto y:x->connections() ){
+					// 		f <<"ID: "<<y.first.str() << ", SigSpec: ";
+					// 		if(y.second.is_bit()){
+					// 			// f << y.second.
+					// 		}					
+					// 	}
+					// }
+					// for(auto cell: module->cells_){
+					// 	f << cell.first.c_str() << " :=: " << cell.second->name.str() << "\n";
+					// }
+					
 					if(has_lut){
+						f << indent << "\n";
 						f << indent << "class EFX_LUT4{\n";
 						f << indent << "// This comment will only be printed out if we have EFX_LUT4 Type cell.\n";
-						for(auto cell: module->selected_cells()){
-							if(check_for_lut){
-								temp_print_wires(cell);
+						f << indent << "\t EFX_LUT4():";
+						
+						
+						for(auto chk_cell:module->cells()){
+							// log("i am in here, lut");
+							if(check_for_lut(chk_cell)){
+								RTLIL::IdString cell_id = chk_cell->name;
+								temp_print(chk_cell,cell_id);
 							}else{
 								continue;
 							}
 						}
-						f << indent << "\n";				
+
+						f << indent << "\n";
 						f << indent << "}; " << "\n";
-						f << indent << "\n\n\n";
+						
 					}
 //
 //				FOR EFX_FF
@@ -2787,16 +2805,20 @@ struct CxxrtlWorker {
 					if(has_ff){
 						f << indent << "class EFX_FF{\n";
 						f << indent << "// This comment will only be printed out if we have EFX_FF Type cell.\n";
-						for(auto cell: module->selected_cells()){
-							if(check_for_ff){
-								temp_print_wires(cell);
+						f << indent << "\t EFX_FF():";
+
+						for(auto chk_cell:module->cells()){
+							// log("i am in here, ff");
+							if(check_for_ff(chk_cell)){								
+								RTLIL::IdString cell_id = chk_cell->name;
+								temp_print(chk_cell,cell_id);
 							}else{
 								continue;
 							}
 						}
-						f << indent << "\n";
+
 						f << indent << "}; " << "\n";
-						f << indent << "\n\n\n";
+						f << indent << "\n";
 					}
 //
 //				FOR CLOCK
@@ -2804,10 +2826,14 @@ struct CxxrtlWorker {
 					if(has_clk){
 						f << indent << "class EFX_CLKBUF{\n";
 						f << indent << "// This comment will only be printed out if we have EFX_CLKBUF Type cell.\n";
-						for(auto cell: module->selected_cells()){
-							if(check_for_gbufce){
-								temp_print_wires(cell);
-							}else{
+						f << indent << "\t EFX_CLKBUF():";
+						for(auto chk_cell:module->cells()){
+							// log("i am in here, ff");
+							if(check_for_gbufce(chk_cell)){
+								RTLIL::IdString cell_id = chk_cell->name;
+								temp_print(chk_cell,cell_id);
+							}
+							else{
 								continue;
 							}
 						}
@@ -2873,7 +2899,7 @@ struct CxxrtlWorker {
 					f << indent << "};\n";
 					f << "\n";
 					f << indent << "void reset() override;\n";
-				
+
 			// to here
 
 					f << "\n";
@@ -2940,7 +2966,7 @@ struct CxxrtlWorker {
 
 		bool generate_our_code = false;
 		for(auto chk_cell:module->selected_cells()){
-				
+
 				if(check_for_lut(chk_cell)){
 					generate_our_code = true;
 					// has_lut = true;
@@ -2953,7 +2979,7 @@ struct CxxrtlWorker {
 					generate_our_code = true;
 					// has_clk = true;
 				}
-			
+
 			}
 
 
@@ -3029,7 +3055,7 @@ struct CxxrtlWorker {
 
 		// RTLIL::IdString lut_id = RTLIL::escape_id("\\EFX_LUT4");
 		// RTLIL::Cell *ch = top_module->cell(lut_id);
-		
+
 		bool generate_our_code = false;
 		for(auto chk_cell:top_module->selected_cells()){
 				std::string chk_id = chk_cell->name.str();
@@ -3045,7 +3071,7 @@ struct CxxrtlWorker {
 					generate_our_code = true;
 					// has_clk = true;
 				}
-			
+
 			}
 
 
