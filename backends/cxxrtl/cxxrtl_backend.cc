@@ -49,7 +49,7 @@ PRIVATE_NAMESPACE_BEGIN
 
 
 
-
+#
 
 
 
@@ -191,7 +191,6 @@ struct Scheduler {
 		return s1;
 	}
 };
-
 bool is_unary_cell(RTLIL::IdString type)
 {
 	return type.in(
@@ -771,7 +770,8 @@ struct CxxrtlWorker {
 	dict<RTLIL::SigBit, bool> bit_has_state;
 	dict<const RTLIL::Module*, pool<std::string>> blackbox_specializations;
 	dict<const RTLIL::Module*, bool> eval_converges;
-
+	std::vector<std::pair<std::string,std::string>> modsigspec;	// for filling sigspec from the module.
+	std::vector<std::string> modport;		// for filling ports from the module.
 	void inc_indent() {
 		indent += "\t";
 	}
@@ -2646,17 +2646,225 @@ struct CxxrtlWorker {
 			          count_skipped_wires > 0 ? " (debug unavailable)" : "");
 		}
 	}
-//mrinal
 
-	void temp_print(RTLIL::Cell *cell,RTLIL::IdString id){
+	std::string check_efx_class(RTLIL::Cell *cell){
+		if (check_for_lut(cell)) return "EFX_LUT4";
+		else if (check_for_ff(cell)) return "EFX_FF";
+		else if (check_for_gbufce(cell)) return "EFX_GBUFCE";
+		else return "unknown";
+	}
+	int check_second_seg(std::string& source,std::string& tocheck){
+		int count = 0;
+    	size_t pos = 0;
+
+    	while ((pos = source.find(tocheck, pos)) != std::string::npos) {
+        	count++;
+        	pos += tocheck.length();
+    	}
+
+		return count;
+	}
+	void parse_the_seg(std::string& str){
+		// auto it = str.find('.');
+		// std::string mstr = "";
+		// for(;it != std::string::npos && it < str.size();it++){
+		// 	mstr += it;
+		// }
+		// f << mstr << ",";
+		std::string newstr;
+		newstr = str.substr(str.find_last_of('.')+1);
+		f << newstr << ",";
+	}
+	bool toparseornot(std::string &str){
+
+	}
+
+	void parsing_it(RTLIL::Cell *cell,std::string& chkstr){
+		for(auto seg:modsigspec){
+			if(check_second_seg(seg.second,chkstr) == 1){
+				if(check_second_seg(seg.first,chkstr)==1){
+					parse_the_seg(seg.first);
+				}else{
+					std::string newstr2;
+					newstr2 = seg.first.substr(seg.first.find_last_of('\\')+1);
+					f << newstr2 << ",";
+				}
+			}
+		}
+
+	}
+	void parsing_for_ff(RTLIL::Cell *cell){
+
+	}
+
+	void parsing_for_gbufce(RTLIL::Cell *cell){
+
+	}
+	std::string parse_cell_name(RTLIL::Cell* cell){
+		std::string temp;
+		if(check_for_ff(cell)){
+			return "FF";
+		}
+		return temp = cell->name.str().substr(cell->name.str().find_last_of('\\')+1);
+
+	}
+	void parsing_for_lutmask(RTLIL::Cell *cell){
+		std::string temp = cell->type.str();
+		// std::string lutmask = temp.substr(temp.find_first_of("16"));
+		f << temp;
+	}
+	void temp_print(RTLIL::Cell *cell){
+
+		f <<check_efx_class(cell)<<" "<<parse_cell_name(cell)<< "(";
+		if(check_for_lut(cell)){
+			std::string chkstr = "LUT__";
+			parsing_it(cell,chkstr);
+			// parsing_for_lutmask(cell);
+			f << ");\n\n";
+		}else if(check_for_ff(cell)){
+			std::string chkstr = "~FF";
+			parsing_it(cell,chkstr);
+			f << ");\n\n";
+		}else if(check_for_gbufce(cell)){
+			std::string chkstr = "CLKBUF__";
+			parsing_it(cell,chkstr);
+			f << ");\n\n";
+		}
 		
-// THis for dumping cell.
-		RTLIL_BACKEND::dump_cell(f,indent.c_str(),cell);
 
+
+	}
+	void dump_efx_design(RTLIL::Module *module){
 		
-		f << "{}\n";	
+			for(auto chk_cell:module->cells()){
+				if(check_for_lut(chk_cell)){
+					dump_efx_lut(chk_cell);
+				}
+				if(check_for_ff(chk_cell)){
+					dump_efx_ff(chk_cell);
+				}
+				if(check_for_gbufce(chk_cell)){
+					dump_efx_gbufce(chk_cell);
+				}
+				continue;
+			}
+		
 
+	}
+	bool has_efx(RTLIL::Module *module){
+		for(auto chk_cell:module->cells()){
+				if(check_for_lut(chk_cell)){
+					return true;
+				}
+				if(check_for_ff(chk_cell)){
+					return true;
+				}
+				if(check_for_gbufce(chk_cell)){
+					return true;
+				}
+		}
+		return false;
+	}
+	void dump_efx_lut(RTLIL::Cell *cell){
+		f << indent << "\n";
+		// f << indent << "class EFX_LUT4{\n";
+		// f << indent << "\t EFX_LUT4():";
 
+		f << indent << "// This comment will only be printed out if we have EFX_LUT4 Type cell.\n";		
+		temp_print(cell);
+		f << indent << "\n";
+		// f << indent << "}; " << "\n";
+
+	}
+	void dump_efx_ff(RTLIL::Cell *cell){
+		f << indent << "\n";
+		// f << indent << "class EFX_FF{\n";
+		// f << indent << "\t EFX_FF():";
+		f << indent << "// This comment will only be printed out if we have EFX_FF Type cell.\n";
+		temp_print(cell);
+		f << indent << "\n";
+		// f << indent << "}; " << "\n";
+	}
+	void dump_efx_gbufce(RTLIL::Cell *cell){
+		f << indent << "\n";
+		// f << indent << "class EFX_CLKBUF{\n";
+		// f << indent << "\t EFX_CLKBUF():";
+		f << indent << "// This comment will only be printed out if we have EFX_CLKBUF Type cell.\n";
+		temp_print(cell);
+		f << indent << "\n";
+		// f << indent << "}; " << "\n";
+		f << indent << "\n";
+
+	
+	}
+	bool module_sigspec_filler(RTLIL::Module *module){
+		// f <<"[SIGSPEC SIZE] "<<module->connections().size()<< "\n";
+		size_t check_size = module->connections().size();
+		for(auto conn : module->connections()){
+			std::string temp_string1,temp_string2;
+			std::ostringstream string_stream;
+			// sigchunk_printer(conn.first);
+			RTLIL_BACKEND::dump_sigspec(string_stream,conn.first,true);			
+			temp_string1 = string_stream.str();
+			RTLIL_BACKEND::dump_sigspec(string_stream,conn.second,true);
+			temp_string2 = string_stream.str();
+			std::pair<std::string,std::string> sigsig {temp_string1,temp_string2};
+			modsigspec.push_back(sigsig);
+		}
+		return modsigspec.size() == check_size ? true : false;
+		
+	}
+	bool module_port_filler(RTLIL::Module *module){
+		// f <<"[PORTSIZE] "<<module->ports.size() << "\n";
+		size_t check_size = module->ports.size();
+		for(auto con : module->ports){
+			std::string temp = con.str();
+			modport.push_back(temp);
+		}
+		return modport.size() == check_size ? true : false;
+		
+	}
+	// std::string sigchunk_printer(RTLIL::SigSpec* sig){
+	// 	std::ostringstream string_stream;
+	// 	RTLIL_BACKEND::dump_sigchunk(string_stream,sig.chunks());
+	// }
+
+	void fillers_and_logs(RTLIL::Module *module){
+		if (module->get_bool_attribute(ID::top)){
+			if(module_sigspec_filler(module)){
+				log("[SUCCESS]mod_sigspec_filler filled successfully.\n");
+			}else{
+				log("[SUCCESS]mod_sigspec_filler didn't filled successfully.\n");
+			}
+			if(module_port_filler(module)){
+				log("[ERROR]mod_port_filler filled successfully. \n");
+			}else{
+				log("[ERROR]mod_port_filler didn't filled successfully. \n");
+			}
+		}
+	}
+	void dump_efx_sigspec(bool toprint){
+		if(toprint){
+			for(auto xon:modsigspec){
+				f <<"[SIGSPEC]:"<< xon.first <<" + "<< xon.second <<"\n";
+			}
+			for(auto xon:modport){
+				f <<"[IDPORT]:"<< xon << "\n";
+			}
+		}else return;
+	}
+	void dump_cell_parameters_arguments(RTLIL :: Module* module,bool toprint){
+		if(toprint){
+		for(auto cell: module->cells()){
+			for(auto xon : cell->parameters){
+				f <<"[DEBUG PARAMETER]"<<xon.first.str()<<" + "<<xon.second.as_string()<<"\n";
+			}
+			for(auto xon : cell->attributes){
+				f << "[DEBUG ATTRIBUTES]" << xon.first.str() <<" + "<< xon.second.as_string() << "\n";
+			}
+
+		}
+		}
 	}
 
 	void dump_module_intf(RTLIL::Module *module)
@@ -2723,137 +2931,33 @@ struct CxxrtlWorker {
 				}
 			}
 		} else {
-//
-//	CORRECTION 1
-//
 
-			bool generate_our_code = false;
-			bool has_lut = false;
-			bool has_ff = false;
-			bool has_clk = false;
 
-		 	for(auto chk_cell:module->cells()){
-
-				if(check_for_lut(chk_cell)){
-					generate_our_code = true;
-					has_lut = true;
-				}
-				if(check_for_ff(chk_cell)){
-					generate_our_code = true;
-					has_ff = true;
-				}
-				if(check_for_gbufce(chk_cell)){
-					generate_our_code = true;
-					has_clk = true;
-				}
-				// bool tmp = check_for_gbufce(chk_cell);
-				// std::cout <<"\n****[bool]: " <<tmp<<"\n";
+			if(has_efx(module)){
+				// fillers_and_logs(module);
+				dump_efx_design(module);
+				dump_efx_sigspec(false);
+				dump_cell_parameters_arguments(module,false);
 			}
+			else{
+				f << indent << "struct " << mangle(module) << " : public module {\n";
+				inc_indent();
 
-//
-//	CORRECTION 2
-//
-				if(generate_our_code){
-
-//
-//				FOR EFX_LUT
-//
-					// for(auto x: module->selected_cells()){
-					// 	for(auto y:x->connections() ){
-					// 		f <<"ID: "<<y.first.str() << ", SigSpec: ";
-					// 		if(y.second.is_bit()){
-					// 			// f << y.second.
-					// 		}					
-					// 	}
-					// }
-					// for(auto cell: module->cells_){
-					// 	f << cell.first.c_str() << " :=: " << cell.second->name.str() << "\n";
-					// }
-					
-					if(has_lut){
-						f << indent << "\n";
-						f << indent << "class EFX_LUT4{\n";
-						f << indent << "// This comment will only be printed out if we have EFX_LUT4 Type cell.\n";
-						f << indent << "\t EFX_LUT4():";
-						
-						
-						for(auto chk_cell:module->cells()){
-							// log("i am in here, lut");
-							if(check_for_lut(chk_cell)){
-								RTLIL::IdString cell_id = chk_cell->name;
-								temp_print(chk_cell,cell_id);
-							}else{
-								continue;
-							}
-						}
-
-						f << indent << "\n";
-						f << indent << "}; " << "\n";
-						
-					}
-//
-//				FOR EFX_FF
-//
-					if(has_ff){
-						f << indent << "class EFX_FF{\n";
-						f << indent << "// This comment will only be printed out if we have EFX_FF Type cell.\n";
-						f << indent << "\t EFX_FF():";
-
-						for(auto chk_cell:module->cells()){
-							// log("i am in here, ff");
-							if(check_for_ff(chk_cell)){								
-								RTLIL::IdString cell_id = chk_cell->name;
-								temp_print(chk_cell,cell_id);
-							}else{
-								continue;
-							}
-						}
-
-						f << indent << "}; " << "\n";
-						f << indent << "\n";
-					}
-//
-//				FOR CLOCK
-//
-					if(has_clk){
-						f << indent << "class EFX_CLKBUF{\n";
-						f << indent << "// This comment will only be printed out if we have EFX_CLKBUF Type cell.\n";
-						f << indent << "\t EFX_CLKBUF():";
-						for(auto chk_cell:module->cells()){
-							// log("i am in here, ff");
-							if(check_for_gbufce(chk_cell)){
-								RTLIL::IdString cell_id = chk_cell->name;
-								temp_print(chk_cell,cell_id);
-							}
-							else{
-								continue;
-							}
-						}
-						f << indent << "\n";
-						f << indent << "}; " << "\n";
-						f << indent << "\n";
-					}
-
-
-				}else{
-					f << indent << "struct " << mangle(module) << " : public module {\n";
-					inc_indent();
-
-					for (auto wire : module->wires())
+				for (auto wire : module->wires())
 						dump_wire(wire, /*is_local=*/false);
-					for (auto wire : module->wires())
+				for (auto wire : module->wires())
 						dump_debug_wire(wire, /*is_local=*/false);
-					bool has_memories = false;
-					for (auto &mem : mod_memories[module]) {
+				bool has_memories = false;
+				for (auto &mem : mod_memories[module]) {
 						dump_attrs(&mem);
 						f << indent << "memory<" << mem.width << "> " << mangle(&mem)
 									<< " { " << mem.size << "u };\n";
 						has_memories = true;
 					}
-					if (has_memories)
+				if (has_memories)
 						f << "\n";
-					bool has_cells = false;
-					for (auto cell : module->cells()) {
+				bool has_cells = false;
+				for (auto cell : module->cells()) {
 						// Async and initial effectful cells have additional state, which requires storage.
 						if (is_effectful_cell(cell->type)) {
 							if (cell->getParam(ID::TRG_ENABLE).as_bool() && cell->getParam(ID::TRG_WIDTH).as_int() == 0)
@@ -2891,16 +2995,7 @@ struct CxxrtlWorker {
 					f << indent << "};\n";
 					f << "\n";
 					f << indent << "void reset() override;\n";
-
-			// to here
-
 					f << "\n";
-
-
-//
-//	CORRECTION 3
-//
-
 					f << indent << "bool eval(performer *performer = nullptr) override;\n";
 					f << "\n";
 					f << indent << "template<class ObserverT>\n";
@@ -2941,47 +3036,7 @@ struct CxxrtlWorker {
 
 	void dump_module_impl(RTLIL::Module *module)
 	{
-
-//******************************//
-//  _mrinal_yadav_eval()_impl   //
-//******************************//
-
-
-//
-//	CORRECTION 4
-//
-
-		// RTLIL::IdString lut_id = RTLIL::escape_id("\\EFX_LUT4");
-		// RTLIL::Cell *ch = module->cell(lut_id);
-
-
-
-		bool generate_our_code = false;
-		for(auto chk_cell:module->selected_cells()){
-
-				if(check_for_lut(chk_cell)){
-					generate_our_code = true;
-					// has_lut = true;
-				}
-				if(check_for_ff(chk_cell)){
-					generate_our_code = true;
-					// has_ff = true;
-				}
-				if(check_for_gbufce(chk_cell)){
-					generate_our_code = true;
-					// has_clk = true;
-				}
-
-			}
-
-
-//
-//	CORRECTION 5
-//
-
-		if(generate_our_code){
-			// f << indent << "bool " << mangle(module) <<"::eval(const std::array<SignalWire *, 4> &Inputs, SignalWire *Output, uint16_t Mask) {\n";
-		}else{
+		if(has_efx(module) == false){
 
 			if (module->get_bool_attribute(ID(cxxrtl_blackbox)))
 			return;
@@ -3005,9 +3060,9 @@ struct CxxrtlWorker {
 							<< "std::string path, metadata_map &&cell_attrs) {\n";
 				dump_debug_info_method(module);
 				f << indent << "}\n";
-			}
+				}
 
-	}
+			}	
 			f << "\n";
 	}
 
@@ -3040,39 +3095,8 @@ struct CxxrtlWorker {
 		log_assert(no_loops);
 		modules.insert(modules.end(), topo_design.sorted.begin(), topo_design.sorted.end());
 
-//
-//	CORRECTION 6
-//
-
-
-		// RTLIL::IdString lut_id = RTLIL::escape_id("\\EFX_LUT4");
-		// RTLIL::Cell *ch = top_module->cell(lut_id);
-
-		bool generate_our_code = false;
-		for(auto chk_cell:top_module->selected_cells()){
-				std::string chk_id = chk_cell->name.str();
-				if(check_for_lut(chk_cell)){
-					generate_our_code = true;
-					// has_lut = true;
-				}
-				if(check_for_ff(chk_cell)){
-					generate_our_code = true;
-					// has_ff = true;
-				}
-				if(check_for_gbufce(chk_cell)){
-					generate_our_code = true;
-					// has_clk = true;
-				}
-
-			}
-
-
-//
-//	CORRECTION 7
-//
-		if(generate_our_code){
-				f << "#// Header files.\n";
-		}else{
+	
+		if(has_efx(top_module) == false){
 			if (split_intf) {
 				// The only thing more depraved than include guards, is mangling filenames to turn them into include guards.
 				std::string include_guard = design_ns + "_header";
@@ -3134,6 +3158,9 @@ struct CxxrtlWorker {
 			f << "\n";
 			f << "namespace " << design_ns << " {\n";
 			f << "\n";
+		}else{
+			fillers_and_logs(top_module);
+			f << "#include<iostream>" << "\n";
 		}
 
 
@@ -3144,27 +3171,11 @@ struct CxxrtlWorker {
 			dump_module_impl(module);
 		}
 
-//
-//	CORRECTION 8
-//
-		if(generate_our_code){
+		if(has_efx(top_module)){
+			f << "\n";
 			f << "\n";
 		}else{
-		f << "} // namespace " << design_ns << "\n";
-		}
-
-		f << "\n";
-
-
-//
-// 	CORRECTION 9
-//
-
-
-		if(generate_our_code){
-			f << "\n";
-		}else{
-
+			f << "} // namespace " << design_ns << "\n";
 			if (top_module != nullptr && debug_info) {
 				f << "extern \"C\"\n";
 				f << "cxxrtl_toplevel " << design_ns << "_create() {\n";
@@ -3177,6 +3188,11 @@ struct CxxrtlWorker {
 				f << "}\n";
 			}
 		}
+
+		f << "\n";
+
+
+
 
 		*impl_f << f.str(); f.str("");
 	}
