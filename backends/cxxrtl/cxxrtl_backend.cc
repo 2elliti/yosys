@@ -49,17 +49,6 @@ PRIVATE_NAMESPACE_BEGIN
 
 
 
-#
-
-
-
-
-
-
-
-
-
-
 template<class T>
 struct Scheduler {
 	struct Vertex {
@@ -770,8 +759,8 @@ struct CxxrtlWorker {
 	dict<RTLIL::SigBit, bool> bit_has_state;
 	dict<const RTLIL::Module*, pool<std::string>> blackbox_specializations;
 	dict<const RTLIL::Module*, bool> eval_converges;
-	std::vector<std::pair<std::string,std::string>> modsigspec;	// for filling sigspec from the module.
-	std::vector<std::string> modport;		// for filling ports from the module.
+	std::vector<std::pair<std::string,std::string>> modsigspec;		// for filling sigspec from the module.
+	std::vector<std::string> modport;								// for filling ports from the module.
 	void inc_indent() {
 		indent += "\t";
 	}
@@ -2381,7 +2370,7 @@ struct CxxrtlWorker {
 	}
 	bool check_for_lut(RTLIL::Cell* chk_cell){
 		std::string id_string = chk_cell->name.str();
-		if(id_string[0] == 92 && id_string[1] == 'L' && id_string[2] == 'U' ){
+		if(id_string.find("\\LUT__") != string::npos){
 			return true;
 		}else{
 			return false;
@@ -2392,9 +2381,7 @@ struct CxxrtlWorker {
 
 	bool check_for_ff(RTLIL::Cell* chk_cell){
 		std::string id_string = chk_cell->name.str();
-		int lt;
-		lt = id_string.length();
-		if(id_string[lt-1]=='F' && id_string[lt-2]=='F' && id_string[lt-3] == '~'){
+		if(id_string.find("~FF") != string::npos){
 			return true;
 		}else{
 			return false;
@@ -2406,7 +2393,7 @@ struct CxxrtlWorker {
 		
 		std::string id_string = chk_cell->name.str();
 		// std::cout << "[ID STRING]:" <<id_string << "\n\n\n";
-		if(id_string[0] == '\\' && id_string[1] =='C' && id_string[2] == 'L'){
+		if(id_string.find("\\CLKBUF") != string::npos){
 			return true;
 		}else{
 			return false;
@@ -2664,34 +2651,36 @@ struct CxxrtlWorker {
 
 		return count;
 	}
-	void parse_the_seg(std::string& str){
-		// auto it = str.find('.');
-		// std::string mstr = "";
-		// for(;it != std::string::npos && it < str.size();it++){
-		// 	mstr += it;
-		// }
-		// f << mstr << ",";
+	bool first = true;
+	std::string parse_the_seg(std::string& str){
 		std::string newstr;
-		newstr = str.substr(str.find_last_of('.')+1);
-		f << newstr << ",";
+		newstr = str.substr(str.find_last_of('.')+1);		
+		return newstr;
 	}
-	bool toparseornot(std::string &str){
-
+	void print_parsed(std::vector<std::string> vec){
+		char prefix = '\0';
+		for (auto& element : vec) {
+    		f << prefix << element;
+    		prefix = ',';
 	}
-
+	}
 	void parsing_it(RTLIL::Cell *cell,std::string& chkstr){
+		vector<std::string> strvec;
 		for(auto seg:modsigspec){
 			if(check_second_seg(seg.second,chkstr) == 1){
 				if(check_second_seg(seg.first,chkstr)==1){
-					parse_the_seg(seg.first);
+					std::string temp;
+					temp = parse_the_seg(seg.first); 
+					strvec.push_back(temp);
 				}else{
-					std::string newstr2;
-					newstr2 = seg.first.substr(seg.first.find_last_of('\\')+1);
-					f << newstr2 << ",";
+					std::string tmp2;
+					tmp2 = seg.first.substr(seg.first.find_last_of('\\')+1); 
+					strvec.push_back(tmp2);
 				}
 			}
 		}
-
+		print_parsed(strvec);
+		
 	}
 	void parsing_for_ff(RTLIL::Cell *cell){
 
@@ -2767,32 +2756,21 @@ struct CxxrtlWorker {
 	}
 	void dump_efx_lut(RTLIL::Cell *cell){
 		f << indent << "\n";
-		// f << indent << "class EFX_LUT4{\n";
-		// f << indent << "\t EFX_LUT4():";
-
 		f << indent << "// This comment will only be printed out if we have EFX_LUT4 Type cell.\n";		
 		temp_print(cell);
 		f << indent << "\n";
-		// f << indent << "}; " << "\n";
-
 	}
 	void dump_efx_ff(RTLIL::Cell *cell){
 		f << indent << "\n";
-		// f << indent << "class EFX_FF{\n";
-		// f << indent << "\t EFX_FF():";
 		f << indent << "// This comment will only be printed out if we have EFX_FF Type cell.\n";
 		temp_print(cell);
 		f << indent << "\n";
-		// f << indent << "}; " << "\n";
 	}
 	void dump_efx_gbufce(RTLIL::Cell *cell){
 		f << indent << "\n";
-		// f << indent << "class EFX_CLKBUF{\n";
-		// f << indent << "\t EFX_CLKBUF():";
 		f << indent << "// This comment will only be printed out if we have EFX_CLKBUF Type cell.\n";
 		temp_print(cell);
 		f << indent << "\n";
-		// f << indent << "}; " << "\n";
 		f << indent << "\n";
 
 	
@@ -2834,10 +2812,10 @@ struct CxxrtlWorker {
 			if(module_sigspec_filler(module)){
 				log("[SUCCESS]mod_sigspec_filler filled successfully.\n");
 			}else{
-				log("[SUCCESS]mod_sigspec_filler didn't filled successfully.\n");
+				log("[ERROR]mod_sigspec_filler didn't filled successfully.\n");
 			}
 			if(module_port_filler(module)){
-				log("[ERROR]mod_port_filler filled successfully. \n");
+				log("[SUCCESS]mod_port_filler filled successfully. \n");
 			}else{
 				log("[ERROR]mod_port_filler didn't filled successfully. \n");
 			}
@@ -2866,6 +2844,7 @@ struct CxxrtlWorker {
 		}
 		}
 	}
+
 
 	void dump_module_intf(RTLIL::Module *module)
 	{
@@ -2936,8 +2915,8 @@ struct CxxrtlWorker {
 			if(has_efx(module)){
 				// fillers_and_logs(module);
 				dump_efx_design(module);
-				dump_efx_sigspec(false);
-				dump_cell_parameters_arguments(module,false);
+				dump_efx_sigspec(true);
+				dump_cell_parameters_arguments(module,true);
 			}
 			else{
 				f << indent << "struct " << mangle(module) << " : public module {\n";
@@ -3036,7 +3015,7 @@ struct CxxrtlWorker {
 
 	void dump_module_impl(RTLIL::Module *module)
 	{
-		if(has_efx(module) == false){
+		if(!has_efx(module)){
 
 			if (module->get_bool_attribute(ID(cxxrtl_blackbox)))
 			return;

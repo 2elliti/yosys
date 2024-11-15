@@ -31,6 +31,7 @@
 YOSYS_NAMESPACE_BEGIN
 
 namespace RTLIL_BACKEND {
+
 	void dump_const(std::ostream &f, const RTLIL::Const &data, int width = -1, int offset = 0, bool autoint = true);
 	void dump_sigchunk(std::ostream &f, const RTLIL::SigChunk &chunk, bool autoint = true);
 	void dump_sigspec(std::ostream &f, const RTLIL::SigSpec &sig, bool autoint = true);
@@ -44,6 +45,7 @@ namespace RTLIL_BACKEND {
 	void dump_conn(std::ostream &f, std::string indent, const RTLIL::SigSpec &left, const RTLIL::SigSpec &right);
 	void dump_module(std::ostream &f, std::string indent, RTLIL::Module *module, RTLIL::Design *design, bool only_selected, bool flag_m = true, bool flag_n = false);
 	void dump_design(std::ostream &f, RTLIL::Design *design, bool only_selected, bool flag_m = true, bool flag_n = false);
+
 }
 
 YOSYS_NAMESPACE_END

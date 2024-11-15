@@ -164,6 +164,7 @@ void RTLIL_BACKEND::dump_memory(std::ostream &f, std::string indent, const RTLIL
 	f << stringf("%s\n", memory->name.c_str());
 }
 
+
 void RTLIL_BACKEND::dump_cell(std::ostream &f, std::string indent, const RTLIL::Cell *cell)
 {
 	for (auto &it : cell->attributes) {
@@ -181,7 +182,7 @@ void RTLIL_BACKEND::dump_cell(std::ostream &f, std::string indent, const RTLIL::
 		f << stringf("\n");
 	}
 	for (auto &it : cell->connections()) {
-		f << stringf("%s  connect %s ", indent.c_str(), it.first.c_str());
+		f << stringf("%s  connect %s ", indent.c_str(), it.first.c_str());		
 		dump_sigspec(f, it.second);
 		f << stringf("\n");
 	}
